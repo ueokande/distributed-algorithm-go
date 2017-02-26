@@ -41,9 +41,7 @@ func main() {
 		r := <-ch
 		if r.err != nil {
 			fmt.Printf("%v returns an error: %v\n", r.p.Id(), r.err)
-		} else if r.p.State() == changroberts.Elected {
-			fmt.Printf("%v is leader\n", r.p.Id())
-		} else if r.p.State() == changroberts.Lost {
+		} else {
 			fmt.Printf("%v's leader is %v\n", r.p.Id(), r.p.Leader())
 		}
 	}

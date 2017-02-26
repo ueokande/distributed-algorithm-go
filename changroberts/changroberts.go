@@ -4,42 +4,27 @@ import (
 	"context"
 )
 
-type State uint
+type state uint
 
 const (
-	Sleep = iota
-	Lost
-	Candidate
-	Elected
+	sleep = iota
+	lost
+	candidate
+	elected
 )
 
-func (s State) String() string {
-	switch s {
-	case Sleep:
-		return "Sleep"
-	case Lost:
-		return "Lost"
-	case Candidate:
-		return "Candidate"
-	case Elected:
-		return "Elected"
-	default:
-		panic("invalid type")
-	}
+type candidateMessage struct {
+	id int
 }
 
-type CandidateMessage struct {
-	Id int
-}
-
-type LeaderMessage struct {
-	Id int
+type leaderMessage struct {
+	id int
 }
 
 type Process struct {
 	id        int
 	leader    int
-	state     State
+	state     state
 	initiator bool
 
 	receive chan interface{}
@@ -50,7 +35,7 @@ func NewInitiator(id int) *Process {
 	return &Process{
 		id:        id,
 		leader:    -1,
-		state:     Candidate,
+		state:     candidate,
 		initiator: true,
 		receive:   make(chan interface{}, 1),
 	}
@@ -60,7 +45,7 @@ func NewNonInitiator(id int) *Process {
 	return &Process{
 		id:        id,
 		leader:    -1,
-		state:     Lost,
+		state:     lost,
 		initiator: false,
 		receive:   make(chan interface{}, 1),
 	}
@@ -74,10 +59,6 @@ func (p *Process) Leader() int {
 	return p.leader
 }
 
-func (p *Process) State() State {
-	return p.state
-}
-
 func (p *Process) Run(ctx context.Context) error {
 	if p.initiator {
 		return p.runInitiator(ctx)
@@ -85,8 +66,9 @@ func (p *Process) Run(ctx context.Context) error {
 		return p.runNonInitiator(ctx)
 	}
 }
+
 func (p *Process) runInitiator(ctx context.Context) error {
-	p.send <- CandidateMessage{p.id}
+	p.send <- candidateMessage{p.id}
 
 	for {
 		select {
@@ -94,24 +76,24 @@ func (p *Process) runInitiator(ctx context.Context) error {
 			return ctx.Err()
 		case msg := <-p.receive:
 			switch msg.(type) {
-			case CandidateMessage:
-				id := msg.(CandidateMessage).Id
+			case candidateMessage:
+				id := msg.(candidateMessage).id
 				if p.id == id {
-					p.state = Elected
-					p.send <- LeaderMessage{p.id}
+					p.state = elected
+					p.send <- leaderMessage{p.id}
 				} else if p.id < id {
 					// do nothing
 				} else { // (n.id > id)
-					p.state = Lost
-					p.send <- CandidateMessage{id}
+					p.state = lost
+					p.send <- candidateMessage{id}
 				}
-			case LeaderMessage:
-				id := msg.(LeaderMessage).Id
+			case leaderMessage:
+				id := msg.(leaderMessage).id
 				if p.id == id {
 					p.leader = p.id
 				} else if p.id != id {
 					p.leader = id
-					p.send <- LeaderMessage{id}
+					p.send <- leaderMessage{id}
 				}
 				return nil
 			}
@@ -126,13 +108,13 @@ func (p *Process) runNonInitiator(ctx context.Context) error {
 			return ctx.Err()
 		case msg := <-p.receive:
 			switch msg.(type) {
-			case CandidateMessage:
-				id := msg.(CandidateMessage).Id
-				p.send <- CandidateMessage{id}
-			case LeaderMessage:
-				id := msg.(LeaderMessage).Id
+			case candidateMessage:
+				id := msg.(candidateMessage).id
+				p.send <- candidateMessage{id}
+			case leaderMessage:
+				id := msg.(leaderMessage).id
 				p.leader = id
-				p.send <- LeaderMessage{id}
+				p.send <- leaderMessage{id}
 				return nil
 			}
 		}
