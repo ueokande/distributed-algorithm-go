@@ -4,15 +4,6 @@ import (
 	"context"
 )
 
-type state uint
-
-const (
-	sleep = iota
-	lost
-	candidate
-	elected
-)
-
 type candidateMessage struct {
 	id int
 }
@@ -24,7 +15,6 @@ type leaderMessage struct {
 type Process struct {
 	id        int
 	leader    int
-	state     state
 	initiator bool
 
 	receive chan interface{}
@@ -35,7 +25,6 @@ func NewInitiator(id int) *Process {
 	return &Process{
 		id:        id,
 		leader:    -1,
-		state:     candidate,
 		initiator: true,
 		receive:   make(chan interface{}, 1),
 	}
@@ -45,7 +34,6 @@ func NewNonInitiator(id int) *Process {
 	return &Process{
 		id:        id,
 		leader:    -1,
-		state:     lost,
 		initiator: false,
 		receive:   make(chan interface{}, 1),
 	}
@@ -79,12 +67,10 @@ func (p *Process) runInitiator(ctx context.Context) error {
 			case candidateMessage:
 				id := msg.(candidateMessage).id
 				if p.id == id {
-					p.state = elected
 					p.send <- leaderMessage{p.id}
 				} else if p.id < id {
 					// do nothing
 				} else { // (n.id > id)
-					p.state = lost
 					p.send <- candidateMessage{id}
 				}
 			case leaderMessage:
